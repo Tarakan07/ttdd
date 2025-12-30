@@ -33,6 +33,7 @@ const App: React.FC = () => {
     setSelectedDay(day);
   }, []);
 
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

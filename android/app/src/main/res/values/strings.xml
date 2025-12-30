@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">ToDo</string>
+    <string name="widget_description">Виджет для отображения задач на сегодня</string>
 </resources>

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DayOfWeek, Task, WeekTasks } from '../types';
 import { loadTasks, saveTasks } from '../utils/storage';
+import { useTasksSyncOnActive } from './useTasksSyncOnActive';
+import { useWidgetSync } from '../widget/useWidgetSync';
 
 /**
  * Хук для управления задачами
@@ -8,6 +10,10 @@ import { loadTasks, saveTasks } from '../utils/storage';
  * При загрузке приложения данные автоматически восстанавливаются из AsyncStorage
  */
 export const useTasks = () => {
+  const { syncTasks } = useWidgetSync((updatedTasks) => {
+    // Обновляем состояние при изменении из виджета
+    setWeekTasks(updatedTasks);
+  });
   const [weekTasks, setWeekTasks] = useState<WeekTasks>({
     monday: [],
     tuesday: [],
@@ -18,6 +24,45 @@ export const useTasks = () => {
     sunday: [],
   });
   const [loading, setLoading] = useState(true);
+
+  // Функция для загрузки данных из raw строки (для синхронизации)
+  const loadFromRaw = useCallback((raw: string | null) => {
+    if (!raw) {
+      setWeekTasks({
+        monday: [],
+        tuesday: [],
+        wednesday: [],
+        thursday: [],
+        friday: [],
+        saturday: [],
+        sunday: [],
+      });
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      const days: DayOfWeek[] = [
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+      ];
+
+      // Валидация структуры
+      if (parsed && typeof parsed === 'object' && days.every(day => Array.isArray(parsed[day]))) {
+        setWeekTasks(parsed);
+      }
+    } catch (error) {
+      console.error('Error parsing tasks from raw string:', error);
+    }
+  }, []);
+
+  // Синхронизация при активации приложения
+  useTasksSyncOnActive(loadFromRaw);
 
   // Загружаем данные из AsyncStorage при инициализации
   useEffect(() => {
@@ -37,13 +82,15 @@ export const useTasks = () => {
           ...prevTasks,
           [day]: [...prevTasks[day], task],
         };
-        saveTasks(newTasks).catch(() => {
-          console.error('Failed to save tasks to AsyncStorage');
-        });
+        saveTasks(newTasks)
+          .then(() => syncTasks(newTasks))
+          .catch(() => {
+            console.error('Failed to save tasks to AsyncStorage');
+          });
         return newTasks;
       });
     },
-    [],
+    [syncTasks],
   );
 
   // Обновляет задачу и сохраняет в AsyncStorage
@@ -54,13 +101,15 @@ export const useTasks = () => {
           ...prevTasks,
           [day]: prevTasks[day].map(t => (t.id === task.id ? task : t)),
         };
-        saveTasks(newTasks).catch(() => {
-          console.error('Failed to save tasks to AsyncStorage');
-        });
+        saveTasks(newTasks)
+          .then(() => syncTasks(newTasks))
+          .catch(() => {
+            console.error('Failed to save tasks to AsyncStorage');
+          });
         return newTasks;
       });
     },
-    [],
+    [syncTasks],
   );
 
   // Удаляет задачу и сохраняет в AsyncStorage
@@ -71,13 +120,15 @@ export const useTasks = () => {
           ...prevTasks,
           [day]: prevTasks[day].filter(t => t.id !== taskId),
         };
-        saveTasks(newTasks).catch(() => {
-          console.error('Failed to save tasks to AsyncStorage');
-        });
+        saveTasks(newTasks)
+          .then(() => syncTasks(newTasks))
+          .catch(() => {
+            console.error('Failed to save tasks to AsyncStorage');
+          });
         return newTasks;
       });
     },
-    [],
+    [syncTasks],
   );
 
   // Переключает статус выполнения задачи и сохраняет в AsyncStorage
@@ -90,13 +141,15 @@ export const useTasks = () => {
             t.id === taskId ? { ...t, completed: !t.completed } : t,
           ),
         };
-        saveTasks(newTasks).catch(() => {
-          console.error('Failed to save tasks to AsyncStorage');
-        });
+        saveTasks(newTasks)
+          .then(() => syncTasks(newTasks))
+          .catch(() => {
+            console.error('Failed to save tasks to AsyncStorage');
+          });
         return newTasks;
       });
     },
-    [],
+    [syncTasks],
   );
 
   return {
