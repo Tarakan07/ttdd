@@ -3,26 +3,109 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="12dp"
     android:background="@android:color/white">
 
     <TextView
         android:id="@+id/widget_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Задачи"
-        android:textSize="18sp"
+        android:text="Задачи на сегодня"
+        android:textSize="16sp"
         android:textStyle="bold"
         android:textColor="@android:color/black"
         android:paddingBottom="8dp" />
 
+    <LinearLayout
+        android:id="@+id/widget_tasks_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Task 1 -->
+        <TextView
+            android:id="@+id/widget_task_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@android:color/black"
+            android:paddingVertical="4dp"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Task 2 -->
+        <TextView
+            android:id="@+id/widget_task_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@android:color/black"
+            android:paddingVertical="4dp"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Task 3 -->
+        <TextView
+            android:id="@+id/widget_task_3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@android:color/black"
+            android:paddingVertical="4dp"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Task 4 -->
+        <TextView
+            android:id="@+id/widget_task_4"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@android:color/black"
+            android:paddingVertical="4dp"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Task 5 -->
+        <TextView
+            android:id="@+id/widget_task_5"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@android:color/black"
+            android:paddingVertical="4dp"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true" />
+
+    </LinearLayout>
+
     <TextView
-        android:id="@+id/widget_content"
+        android:id="@+id/widget_empty_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Нет задач"
+        android:text="Нет задач на сегодня"
         android:textSize="14sp"
-        android:textColor="@android:color/black" />
+        android:textColor="@android:color/darker_gray"
+        android:gravity="center"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_open_app_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Открыть приложение"
+        android:textSize="14sp"
+        android:textColor="@android:color/white"
+        android:background="@drawable/widget_button_background"
+        android:padding="10dp"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true" />
 
 </LinearLayout>
-

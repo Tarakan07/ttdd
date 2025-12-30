@@ -71,24 +71,70 @@ class TodoAppWidgetProvider : AppWidgetProvider() {
             val tasks = TaskUtils.getTodayTasks(context)
             android.util.Log.d("TodoAppWidgetProvider", "Found ${tasks.size} tasks for today")
             
-            // Используем упрощенный layout для тестирования
             val views = RemoteViews(context.packageName, R.layout.widget_todo_simple)
             
-            // УПРОЩЕННЫЙ ВИДЖЕТ - только текст, без checkbox
-            val contentText = if (tasks.isEmpty()) {
-                "Нет задач на сегодня"
-            } else {
-                val tasksList = tasks.take(5).mapIndexed { index, task ->
-                    val status = if (task.completed) "✓" else "○"
-                    val important = if (task.important) "⭐ " else ""
-                    "$status $important${task.text}"
-                }.joinToString("\n")
-                tasksList
-            }
+            // Скрываем все задачи сначала
+            val taskViewIds = listOf(
+                R.id.widget_task_1,
+                R.id.widget_task_2,
+                R.id.widget_task_3,
+                R.id.widget_task_4,
+                R.id.widget_task_5
+            )
+            taskViewIds.forEach { views.setViewVisibility(it, View.GONE) }
             
-            views.setTextViewText(R.id.widget_content, contentText)
+            if (tasks.isEmpty()) {
+                // Показываем пустое состояние
+                views.setViewVisibility(R.id.widget_tasks_container, View.GONE)
+                views.setViewVisibility(R.id.widget_empty_text, View.VISIBLE)
+            } else {
+                // Показываем задачи
+                views.setViewVisibility(R.id.widget_tasks_container, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_empty_text, View.GONE)
+                
+                val displayTasks = tasks.take(5)
+                displayTasks.forEachIndexed { index, task ->
+                    val taskViewId = taskViewIds[index]
+                    views.setViewVisibility(taskViewId, View.VISIBLE)
+                    
+                    // Формируем текст задачи со смайликами
+                    val emoji = if (task.important) "🔥" else "📝"
+                    val status = if (task.completed) "✓" else "○"
+                    val taskText = "$status $emoji ${task.text}"
+                    
+                    views.setTextViewText(taskViewId, taskText)
+                    
+                    // Зачеркиваем текст если задача выполнена
+                    try {
+                        if (task.completed) {
+                            views.setInt(taskViewId, "setPaintFlags", Paint.STRIKE_THRU_TEXT_FLAG or Paint.ANTI_ALIAS_FLAG)
+                            views.setTextColor(taskViewId, 0xFF808080.toInt()) // серый цвет
+                        } else {
+                            views.setInt(taskViewId, "setPaintFlags", Paint.ANTI_ALIAS_FLAG)
+                            views.setTextColor(taskViewId, 0xFF000000.toInt()) // черный цвет
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("TodoAppWidgetProvider", "Cannot set text style", e)
+                    }
+                    
+                    // Устанавливаем обработчик клика для переключения задачи
+                    val toggleIntent = Intent(context, TodoAppWidgetProvider::class.java).apply {
+                        action = "com.todo.widget.TOGGLE_TASK"
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                        putExtra("task_id", task.id)
+                    }
+                    val requestCode = Math.abs((task.id.hashCode() + index * 1000) % Integer.MAX_VALUE)
+                    val pendingIntent = android.app.PendingIntent.getBroadcast(
+                        context,
+                        requestCode,
+                        toggleIntent,
+                        android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(taskViewId, pendingIntent)
+                }
+            }
 
-            // Обработчик клика для открытия приложения
+            // Обработчик клика для кнопки открытия приложения
             val openAppIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             if (openAppIntent != null) {
                 openAppIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -98,10 +144,10 @@ class TodoAppWidgetProvider : AppWidgetProvider() {
                     openAppIntent,
                     android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
                 )
-                views.setOnClickPendingIntent(R.id.widget_content, pendingIntent)
+                views.setOnClickPendingIntent(R.id.widget_open_app_button, pendingIntent)
             }
 
-            android.util.Log.d("TodoAppWidgetProvider", "Calling updateAppWidget (simple version)")
+            android.util.Log.d("TodoAppWidgetProvider", "Calling updateAppWidget")
             appWidgetManager.updateAppWidget(appWidgetId, views)
             android.util.Log.d("TodoAppWidgetProvider", "Widget updated successfully")
         } catch (e: Exception) {
@@ -109,7 +155,9 @@ class TodoAppWidgetProvider : AppWidgetProvider() {
             e.printStackTrace()
             try {
                 val errorViews = RemoteViews(context.packageName, R.layout.widget_todo_simple)
-                errorViews.setTextViewText(R.id.widget_content, "Ошибка: ${e.message}")
+                errorViews.setViewVisibility(R.id.widget_tasks_container, View.GONE)
+                errorViews.setViewVisibility(R.id.widget_empty_text, View.VISIBLE)
+                errorViews.setTextViewText(R.id.widget_empty_text, "Ошибка: ${e.message}")
                 appWidgetManager.updateAppWidget(appWidgetId, errorViews)
             } catch (e2: Exception) {
                 android.util.Log.e("TodoAppWidgetProvider", "Error showing error state", e2)
