@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
-    "android:build": "cd android && ./gradlew assembleDebug",
+    "android:build": "cd android && ./gradlew clean && ./gradlew assembleDebug",
     "android:build-release": "cd android && ./gradlew assembleRelease",
     "android:devices": "adb devices",
     "ios": "react-native run-ios",

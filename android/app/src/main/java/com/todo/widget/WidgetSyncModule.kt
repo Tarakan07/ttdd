@@ -38,20 +38,35 @@ class WidgetSyncModule(reactContext: ReactApplicationContext) : ReactContextBase
             val taskList = mutableListOf<Task>()
             for (i in 0 until tasks.size()) {
                 val taskMap = tasks.getMap(i) ?: continue
+                val taskId = taskMap.getString("id") ?: continue
+                val taskText = taskMap.getString("text") ?: continue
+                val taskDay = taskMap.getString("day") ?: continue
+                
+                // Пропускаем задачи с пустыми обязательными полями
+                if (taskId.isEmpty() || taskText.isEmpty() || taskDay.isEmpty()) {
+                    android.util.Log.w("WidgetSyncModule", "Skipping task with empty required fields")
+                    continue
+                }
+                
                 val task = Task(
-                    id = taskMap.getString("id") ?: "",
-                    text = taskMap.getString("text") ?: "",
+                    id = taskId,
+                    text = taskText,
                     completed = taskMap.getBoolean("completed"),
                     important = taskMap.getBoolean("important"),
-                    day = taskMap.getString("day") ?: ""
+                    day = taskDay
                 )
                 taskList.add(task)
             }
             
+            android.util.Log.d("WidgetSyncModule", "Syncing ${taskList.size} tasks to widget")
             TaskUtils.saveTasks(reactApplicationContext, taskList)
-            updateWidget()
+            // Обновляем виджет асинхронно, чтобы не блокировать UI
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                updateWidget()
+            }, 100) // Небольшая задержка для избежания конфликтов
             promise.resolve(true)
         } catch (e: Exception) {
+            android.util.Log.e("WidgetSyncModule", "Error syncing tasks", e)
             promise.reject("SYNC_ERROR", e.message, e)
         }
     }
@@ -92,13 +107,22 @@ class WidgetSyncModule(reactContext: ReactApplicationContext) : ReactContextBase
     }
 
     private fun updateWidget() {
-        val intent = Intent(reactApplicationContext, TodoAppWidgetProvider::class.java).apply {
-            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+        try {
+            val intent = Intent(reactApplicationContext, TodoAppWidgetProvider::class.java).apply {
+                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            }
+            val ids = AppWidgetManager.getInstance(reactApplicationContext)
+                .getAppWidgetIds(ComponentName(reactApplicationContext, TodoAppWidgetProvider::class.java))
+            if (ids.isNotEmpty()) {
+                intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                reactApplicationContext.sendBroadcast(intent)
+                android.util.Log.d("WidgetSyncModule", "Widget update broadcast sent for ${ids.size} widgets")
+            } else {
+                android.util.Log.d("WidgetSyncModule", "No widgets to update")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("WidgetSyncModule", "Error updating widget", e)
         }
-        val ids = AppWidgetManager.getInstance(reactApplicationContext)
-            .getAppWidgetIds(ComponentName(reactApplicationContext, TodoAppWidgetProvider::class.java))
-        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-        reactApplicationContext.sendBroadcast(intent)
     }
     
     private fun sendEvent(taskId: String) {

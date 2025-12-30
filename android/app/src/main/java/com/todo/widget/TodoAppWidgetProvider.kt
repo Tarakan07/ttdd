@@ -17,8 +17,13 @@ class TodoAppWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
+        android.util.Log.d("TodoAppWidgetProvider", "onUpdate called for ${appWidgetIds.size} widgets")
         for (appWidgetId in appWidgetIds) {
-            updateAppWidget(context, appWidgetManager, appWidgetId)
+            try {
+                updateAppWidget(context, appWidgetManager, appWidgetId)
+            } catch (e: Exception) {
+                android.util.Log.e("TodoAppWidgetProvider", "Error updating widget $appWidgetId in onUpdate", e)
+            }
         }
     }
 
@@ -41,11 +46,14 @@ class TodoAppWidgetProvider : AppWidgetProvider() {
             }
             AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
                 super.onReceive(context, intent)
-                val appWidgetManager = AppWidgetManager.getInstance(context)
-                val appWidgetIds = appWidgetManager.getAppWidgetIds(
-                    android.content.ComponentName(context, TodoAppWidgetProvider::class.java)
-                )
-                onUpdate(context, appWidgetManager, appWidgetIds)
+                // Получаем ID виджетов из intent, если они есть
+                val appWidgetIds = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS)
+                    ?: AppWidgetManager.getInstance(context).getAppWidgetIds(
+                        android.content.ComponentName(context, TodoAppWidgetProvider::class.java)
+                    )
+                if (appWidgetIds.isNotEmpty()) {
+                    onUpdate(context, AppWidgetManager.getInstance(context), appWidgetIds)
+                }
             }
             else -> {
                 super.onReceive(context, intent)
@@ -58,113 +66,55 @@ class TodoAppWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int
     ) {
-        val tasks = TaskUtils.getTodayTasks(context)
-        val views = RemoteViews(context.packageName, R.layout.widget_todo)
-
-        if (tasks.isEmpty()) {
-            views.setViewVisibility(R.id.widget_empty_text, View.VISIBLE)
-            views.setViewVisibility(R.id.widget_tasks_container, View.GONE)
-        } else {
-            views.setViewVisibility(R.id.widget_empty_text, View.GONE)
-            views.setViewVisibility(R.id.widget_tasks_container, View.VISIBLE)
-
-            // Ограничиваем до 5 задач для виджета
-            val displayTasks = tasks.take(5)
+        try {
+            android.util.Log.d("TodoAppWidgetProvider", "Updating widget, appWidgetId: $appWidgetId")
+            val tasks = TaskUtils.getTodayTasks(context)
+            android.util.Log.d("TodoAppWidgetProvider", "Found ${tasks.size} tasks for today")
             
-            // Показываем только первые 5 задач
-            for (i in 0 until 5) {
-                val taskLayoutId = when (i) {
-                    0 -> R.id.widget_task_1
-                    1 -> R.id.widget_task_2
-                    2 -> R.id.widget_task_3
-                    3 -> R.id.widget_task_4
-                    4 -> R.id.widget_task_5
-                    else -> null
-                }
+            // Используем упрощенный layout для тестирования
+            val views = RemoteViews(context.packageName, R.layout.widget_todo_simple)
+            
+            // УПРОЩЕННЫЙ ВИДЖЕТ - только текст, без checkbox
+            val contentText = if (tasks.isEmpty()) {
+                "Нет задач на сегодня"
+            } else {
+                val tasksList = tasks.take(5).mapIndexed { index, task ->
+                    val status = if (task.completed) "✓" else "○"
+                    val important = if (task.important) "⭐ " else ""
+                    "$status $important${task.text}"
+                }.joinToString("\n")
+                tasksList
+            }
+            
+            views.setTextViewText(R.id.widget_content, contentText)
 
-                if (i < displayTasks.size && taskLayoutId != null) {
-                    val task = displayTasks[i]
-                    views.setViewVisibility(taskLayoutId, View.VISIBLE)
-                    
-                    val checkboxId = when (i) {
-                        0 -> R.id.widget_checkbox_1
-                        1 -> R.id.widget_checkbox_2
-                        2 -> R.id.widget_checkbox_3
-                        3 -> R.id.widget_checkbox_4
-                        4 -> R.id.widget_checkbox_5
-                        else -> null
-                    }
-                    
-                    val textId = when (i) {
-                        0 -> R.id.widget_text_1
-                        1 -> R.id.widget_text_2
-                        2 -> R.id.widget_text_3
-                        3 -> R.id.widget_text_4
-                        4 -> R.id.widget_text_5
-                        else -> null
-                    }
-                    
-                    val importantId = when (i) {
-                        0 -> R.id.widget_important_1
-                        1 -> R.id.widget_important_2
-                        2 -> R.id.widget_important_3
-                        3 -> R.id.widget_important_4
-                        4 -> R.id.widget_important_5
-                        else -> null
-                    }
+            // Обработчик клика для открытия приложения
+            val openAppIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            if (openAppIntent != null) {
+                openAppIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                val pendingIntent = android.app.PendingIntent.getActivity(
+                    context,
+                    0,
+                    openAppIntent,
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                )
+                views.setOnClickPendingIntent(R.id.widget_content, pendingIntent)
+            }
 
-                    if (checkboxId != null && textId != null && importantId != null) {
-                        views.setBoolean(checkboxId, "setChecked", task.completed)
-                        views.setTextViewText(textId, task.text)
-                        
-                        // Зачеркиваем текст если задача выполнена
-                        if (task.completed) {
-                            views.setInt(textId, "setPaintFlags", Paint.STRIKE_THRU_TEXT_FLAG or Paint.ANTI_ALIAS_FLAG)
-                            views.setTextColor(textId, ContextCompat.getColor(context, android.R.color.darker_gray))
-                        } else {
-                            views.setInt(textId, "setPaintFlags", Paint.ANTI_ALIAS_FLAG)
-                            views.setTextColor(textId, ContextCompat.getColor(context, android.R.color.black))
-                        }
-                        
-                        // Показываем/скрываем индикатор важности
-                        if (task.important) {
-                            views.setViewVisibility(importantId, View.VISIBLE)
-                        } else {
-                            views.setViewVisibility(importantId, View.GONE)
-                        }
-                        
-                        // Устанавливаем обработчик клика для переключения задачи
-                        val toggleIntent = Intent(context, TodoAppWidgetProvider::class.java).apply {
-                            action = "com.todo.widget.TOGGLE_TASK"
-                            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                            putExtra("task_id", task.id)
-                        }
-                        val pendingIntent = android.app.PendingIntent.getBroadcast(
-                            context,
-                            task.id.hashCode(),
-                            toggleIntent,
-                            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-                        )
-                        views.setOnClickPendingIntent(checkboxId, pendingIntent)
-                        views.setOnClickPendingIntent(textId, pendingIntent)
-                    }
-                } else if (taskLayoutId != null) {
-                    views.setViewVisibility(taskLayoutId, View.GONE)
-                }
+            android.util.Log.d("TodoAppWidgetProvider", "Calling updateAppWidget (simple version)")
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+            android.util.Log.d("TodoAppWidgetProvider", "Widget updated successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("TodoAppWidgetProvider", "Error updating widget", e)
+            e.printStackTrace()
+            try {
+                val errorViews = RemoteViews(context.packageName, R.layout.widget_todo_simple)
+                errorViews.setTextViewText(R.id.widget_content, "Ошибка: ${e.message}")
+                appWidgetManager.updateAppWidget(appWidgetId, errorViews)
+            } catch (e2: Exception) {
+                android.util.Log.e("TodoAppWidgetProvider", "Error showing error state", e2)
             }
         }
-
-        // Обработчик клика для открытия приложения
-        val openAppIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        val pendingIntent = android.app.PendingIntent.getActivity(
-            context,
-            0,
-            openAppIntent,
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widget_title, pendingIntent)
-
-        appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
     private fun sendTaskUpdateToRN(context: Context, taskId: String) {
